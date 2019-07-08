@@ -50,9 +50,12 @@ func update(e encoder.Encoder, data map[string]interface{}, v *mvccpb.KeyValue, 
 		case "delete":
 			data = make(map[string]interface{})
 		default:
-			v, ok := vals.(map[string]interface{})
+			//v, ok := vals.(map[string]interface{})
+			val, ok := vals.(map[string]interface{})
 			if ok {
-				data = v
+				data[vkey] = val
+			} else {
+				data[vkey] = string(v.Value)
 			}
 		}
 		return data
@@ -76,7 +79,13 @@ func update(e encoder.Encoder, data map[string]interface{}, v *mvccpb.KeyValue, 
 			case "delete":
 				delete(kvals, k)
 			default:
-				kvals[k] = vals
+				//kvals[k] = vals
+				val, ok := vals.(map[string]interface{})
+				if ok {
+					kvals[k] = val
+				} else {
+					kvals[k] = string(v.Value)
+				}
 			}
 			break
 		}
