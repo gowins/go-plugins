@@ -51,9 +51,9 @@ require (
 	github.com/jonboulle/clockwork v0.1.0 // indirect
 	github.com/juju/ratelimit v1.0.1
 	github.com/micro/cli v0.2.0
-	github.com/micro/go-micro v1.7.1-0.20190708071826-d3edad474ed7
+	github.com/micro/go-micro v1.7.1-0.20190709174126-0bf54c122f2c
 	github.com/micro/mdns v0.1.1-0.20190624125042-790ba6222fe3 // indirect
-	github.com/micro/micro v1.7.1-0.20190627121529-410a2eba67f1
+	github.com/micro/micro v1.7.1-0.20190709174227-b038441fa11b
 	github.com/minio/highwayhash v1.0.0
 	github.com/mitchellh/hashstructure v1.0.0
 	github.com/nats-io/jwt v0.2.8 // indirect
