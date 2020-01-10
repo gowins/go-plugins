@@ -48,7 +48,9 @@ func update(e encoder.Encoder, data map[string]interface{}, v *mvccpb.KeyValue, 
 	if !haveSplit && len(keys) == 1 {
 		switch action {
 		case "delete":
-			data = make(map[string]interface{})
+			// data = make(map[string]interface{})
+			kvals := data
+			delete(kvals, keys[0])
 		default:
 			//v, ok := vals.(map[string]interface{})
 			val, ok := vals.(map[string]interface{})
