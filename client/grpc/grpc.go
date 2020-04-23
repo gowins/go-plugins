@@ -270,7 +270,24 @@ func (g *grpcClient) NewRequest(service, method string, req interface{}, reqOpts
 	return newGRPCRequest(service, method, req, g.opts.ContentType, reqOpts...)
 }
 
-func (g *grpcClient) Call(ctx context.Context, req client.Request, rsp interface{}, opts ...client.CallOption) error {
+func (g *grpcClient) Call(ctx context.Context, req client.Request, rsp interface{}, opts ...client.CallOption) (callErr error) {
+	var callNode *registry.Node
+	defer func() {
+		if callErr != nil {
+			if callNode == nil {
+				return
+			}
+
+			if v, ok:= callErr.(*errors.Error); ok{
+				v.Detail = fmt.Sprintf("error: %v, node: %v", v.Detail, callNode.Id)
+				callErr = v
+			} else {
+				callErr = fmt.Errorf("error: %v, node: %v", callErr, callNode.Id)
+			}
+			return
+		}
+	}()
+
 	// make a copy of call opts
 	callOpts := g.opts.CallOptions
 	for _, opt := range opts {
@@ -329,6 +346,9 @@ func (g *grpcClient) Call(ctx context.Context, req client.Request, rsp interface
 		} else if err != nil {
 			return errors.InternalServerError("go.micro.client", err.Error())
 		}
+
+		// 保存最后选中的 node
+		callNode = node
 
 		// make the call
 		err = gcall(ctx, node, req, rsp, callOpts)
