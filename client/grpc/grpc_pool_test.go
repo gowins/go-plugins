@@ -50,9 +50,9 @@ func testPool(t *testing.T, size int, ttl time.Duration) {
 		p.release(l.Addr().String(), cc, nil)
 
 		p.Lock()
-		if i := len(p.conns[l.Addr().String()]); i > size {
+		if i := p.conns[l.Addr().String()]; i != nil {
 			p.Unlock()
-			t.Fatalf("pool size %d is greater than expected %d", i, size)
+			t.Fatalf("pool size %v is greater than expected %d", i, size)
 		}
 		p.Unlock()
 	}
