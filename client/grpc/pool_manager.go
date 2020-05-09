@@ -261,8 +261,9 @@ func (m *poolManager) tryClose(conn *poolConn) {
 	}
 }
 
-// cleanup 定时清理无用的连接
-func (m *poolManager) cleanup() bool {
+// canCleanup 表示是否可以清理
+// 独立于 cleanup 是让 pool 对 manager 的管理过程，没有锁间隙
+func (m *poolManager) canCleanup() bool {
 	m.Lock()
 	defer m.Unlock()
 
@@ -270,14 +271,20 @@ func (m *poolManager) cleanup() bool {
 		return false
 	}
 
+	return true
+}
+
+// cleanup 定时清理无用的连接
+func (m *poolManager) cleanup() {
+	m.Lock()
+	defer m.Unlock()
+
 	for conn := range m.data {
 		if conn.refCount > 0 {
 			tracer.AddTrace("[cleanup] invalid: conn haven't been closed. ", m.addr)
 		}
 		_ = conn.ClientConn.Close()
 	}
-
-	return true
 }
 
 // ticket 门票概念
