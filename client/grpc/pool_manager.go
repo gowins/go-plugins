@@ -21,6 +21,72 @@ const (
 	randCreatedIn = 60
 )
 
+type connNode struct {
+	*poolConn
+	next *connNode
+	prev *connNode
+}
+
+type connRing struct {
+	size    int
+	current *poolConn
+	mux     sync.Mutex
+}
+
+func (r *connRing) addBehind(n2 *poolConn) {
+	r.mux.Lock()
+	defer r.mux.Unlock()
+
+	if r.current == nil {
+		r.current = n2
+		r.current.next, r.current.prev = n2, n2
+		return
+	}
+
+	n3 := r.current.next
+	// bind n2 and n3
+	n3.prev = n2
+	n2.next = n3
+
+	// bind n2 and current
+	r.current.next = n2
+	n2.prev = r.current
+	r.size++
+}
+
+func (r *connRing) nextTurn() *poolConn {
+	r.mux.Lock()
+	defer r.mux.Unlock()
+
+	if r.current == nil {
+		return nil
+	}
+
+	n := r.current.next
+	r.current = r.current.next
+
+	return n
+}
+
+func (r *connRing) del(n2 *poolConn) {
+	r.mux.Lock()
+	defer r.mux.Unlock()
+
+	if n2 == nil {
+		return
+	}
+
+	n1 := n2.prev
+	n3 := n2.next
+
+	n1.next = n3
+	n3.prev = n2
+	// waiting for gc
+	n2 = nil
+
+	r.size--
+}
+
 type poolManager struct {
 	sync.Mutex
 
@@ -28,6 +94,10 @@ type poolManager struct {
 	indexes []*poolConn
 	// 真实可用的连接
 	data map[*poolConn]struct{}
+
+	// 连接环
+	ring *connRing
+
 	// 真实 pool 的大小，也就是最大池子长度
 	size int
 	// 连接有效期
@@ -52,8 +122,11 @@ const (
 func newManager(addr string, size int, ttl int64) *poolManager {
 	tickerCount := size
 	manager := &poolManager{
+		// todo
 		indexes: make([]*poolConn, 0, 0),
 		data:    make(map[*poolConn]struct{}),
+		// todo
+		ring:    &connRing{},
 		size:    size,
 		ttl:     ttl,
 		addr:    addr,
@@ -64,14 +137,9 @@ func newManager(addr string, size int, ttl int64) *poolManager {
 }
 
 func (m *poolManager) isValid(conn *poolConn) connState {
-	// 无效 1
-	if conn == nil {
-		return invalid
-	}
-
-	// 无效 2
+	// 无效 1 2
 	// 已经从真实数据中移除
-	if _, ok := m.data[conn]; !ok {
+	if conn == nil {
 		return invalid
 	}
 
@@ -90,9 +158,10 @@ func (m *poolManager) isValid(conn *poolConn) connState {
 	// ===================================================================
 	// 有效 1
 	// 如果池子已经到达了上限了，那么只要此连接状态是可用的，就认为是有效的连接
-	if len(m.data) >= m.size {
+	if m.ring.size >= m.size {
 		return poolFull
 	}
+
 	// 有效 2
 	// 如果池子还没有满，但是当前连接已经到达了每个连接上承载的请求数时，认为些连接无效
 	if conn.refCount < requestPerConn {
@@ -138,30 +207,25 @@ func (m *poolManager) tryFindOne() (*poolConn, bool) {
 	defer m.Unlock()
 	m.updatedAt = time.Now() // 更新最后使用时间
 
-	for idx, conn := range m.indexes {
-		// 直接移除，下一个请求直接不再选择
-		// 标识可关闭
-		state := m.isValid(conn)
-		if state == invalid {
-			conn.closable = true
-			m.tryClose(conn)
-			continue
-		} else if state == moreThanRef {
-			continue
-		}
-
-		// 在返回前处理下索引对象，将其移动到最末尾
-		m.indexes = m.indexes[idx+1:]
-		m.indexes = append(m.indexes, conn)
-
-		// 增加当前连接的引用计数
-		conn.refCount++
-
-		tracer.AddTrace(conn, "=============>", conn.refCount)
-		return conn, true
+	conn := m.ring.nextTurn()
+	if conn == nil {
+		return nil, false
 	}
 
-	return nil, false
+	state := m.isValid(conn)
+	if state == invalid {
+		conn.closable = true
+		m.tryClose(conn)
+		return m.tryFindOne()
+	} else if state == moreThanRef {
+		return m.tryFindOne()
+	}
+
+	// 增加当前连接的引用计数
+	conn.refCount++
+
+	tracer.AddTrace(conn, "=============>", conn.refCount)
+	return conn, true
 }
 
 func (m *poolManager) create(opts ...grpc.DialOption) (*poolConn, error) {
@@ -219,9 +283,8 @@ func (m *poolManager) put(conn *poolConn, err error) {
 	// 2.
 	// 如果池子里已经满了则应该可关闭
 	// 如果不在池子里，池子也不满则放入池子，并且开始复用
-	_, inPool := m.data[conn]
-	if !inPool {
-		if len(m.data) >= m.size {
+	if conn.next == conn.prev && conn.next == nil {
+		if m.ring.size >= m.size {
 			conn.closable = true
 			tracer.AddTrace("[put] pool is full.", m.addr, err)
 		}
@@ -234,10 +297,9 @@ func (m *poolManager) put(conn *poolConn, err error) {
 	}
 
 	// 二次判断的原因是因为前面可能是 closable 的状态
-	if !inPool {
+	if conn.next == conn.prev && conn.next == nil {
 		// 因为如果下一个选择还是会判断是否有效的，这里加入可提前让连接复用
-		m.indexes = append(m.indexes, conn)
-		m.data[conn] = struct{}{}
+		m.ring.addBehind(conn)
 	}
 
 	return
@@ -248,7 +310,8 @@ func (m *poolManager) tryClose(conn *poolConn) {
 	tracer.AddTrace("[tryClose] close client connection:", conn)
 
 	// 1. 从连接管理中移除，不让下一个选中
-	delete(m.data, conn)
+	// delete(m.data, conn)
+	m.ring.del(conn)
 
 	// 2. 判断 refCount 是否为 0， 如果为 0 则直接关闭了
 	if conn.refCount <= 0 {
@@ -279,7 +342,8 @@ func (m *poolManager) cleanup() {
 	m.Lock()
 	defer m.Unlock()
 
-	for conn := range m.data {
+	for end := m.ring.current.next; end != m.ring.current; {
+		conn := m.ring.nextTurn()
 		if conn.refCount > 0 {
 			tracer.AddTrace("[cleanup] invalid: conn haven't been closed. ", m.addr)
 		}

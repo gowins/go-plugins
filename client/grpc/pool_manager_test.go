@@ -415,3 +415,14 @@ func TestPool(t *testing.T) {
 	})
 
 }
+
+func TestRing(t *testing.T)  {
+	r:=&connRing{}
+	for i := 0; i < 2; i++ {
+		r.addBehind(&poolConn{})
+	}
+	for i := 0; i < 3; i++ {
+		fmt.Println(fmt.Sprintf("%p",r.nextTurn()))
+	}
+
+}
