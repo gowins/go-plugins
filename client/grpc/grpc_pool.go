@@ -71,16 +71,30 @@ func (p *pool) getManager(addr string) *poolManager {
 func (p *pool) cleanup() {
 	timer := time.NewTicker(cleanupInterval)
 	for range timer.C {
-		p.Lock()
-		snapshots := p.conns
-		p.Unlock()
+		cleans := p.findCanCleanups()
 
-		for addr, manager := range snapshots {
-			if manager.cleanup() {
-				p.Lock()
-				delete(p.conns, addr)
-				p.Unlock()
-			}
+		if len(cleans) == 0 {
+			continue
+		}
+
+		for _, manager := range cleans {
+			manager.cleanup()
 		}
 	}
+}
+
+func (p *pool) findCanCleanups() map[string]*poolManager {
+	p.Lock()
+	defer p.Unlock()
+
+	cleans := make(map[string]*poolManager)
+
+	for addr, manager := range p.conns {
+		if manager != nil && manager.canCleanup() {
+			cleans[addr] = manager
+			delete(p.conns, addr)
+		}
+	}
+
+	return cleans
 }
