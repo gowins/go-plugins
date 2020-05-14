@@ -138,6 +138,7 @@ func (m *poolManager) tryFindOne() (*poolConn, bool) {
 	defer m.Unlock()
 	m.updatedAt = time.Now() // 更新最后使用时间
 
+	var nextRound []*poolConn // 进入下一轮
 	for idx, conn := range m.indexes {
 		// 直接移除，下一个请求直接不再选择
 		// 标识可关闭
@@ -147,12 +148,17 @@ func (m *poolManager) tryFindOne() (*poolConn, bool) {
 			m.tryClose(conn)
 			continue
 		} else if state == moreThanRef {
+			// 此连接参与下一轮服务
+			nextRound = append(nextRound, conn)
 			continue
 		}
 
+		// 此连接参与下一轮服务
+		nextRound = append(nextRound, conn)
+
 		// 在返回前处理下索引对象，将其移动到最末尾
 		m.indexes = m.indexes[idx+1:]
-		m.indexes = append(m.indexes, conn)
+		m.indexes = append(m.indexes, nextRound...)
 
 		// 增加当前连接的引用计数
 		conn.refCount++
@@ -160,6 +166,9 @@ func (m *poolManager) tryFindOne() (*poolConn, bool) {
 		tracer.AddTrace(conn, "=============>", conn.refCount)
 		return conn, true
 	}
+
+	// 找不到时则认为只有存在于下一轮中的连接可用
+	m.indexes = nextRound
 
 	return nil, false
 }
