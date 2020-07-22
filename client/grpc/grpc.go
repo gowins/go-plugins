@@ -100,8 +100,6 @@ func (g *grpcClient) call(ctx context.Context, node *registry.Node, req client.R
 	maxRecvMsgSize := g.maxRecvMsgSizeValue()
 	maxSendMsgSize := g.maxSendMsgSizeValue()
 
-	var grr error
-
 	cc, err := g.pool.getConn(address, grpc.WithDefaultCallOptions(grpc.CallCustomCodec(cf)),
 		grpc.WithTimeout(opts.DialTimeout), g.secure(),
 		grpc.WithDefaultCallOptions(
@@ -111,21 +109,30 @@ func (g *grpcClient) call(ctx context.Context, node *registry.Node, req client.R
 	if err != nil {
 		return errors.InternalServerError("go.micro.client", fmt.Sprintf("Error sending request: %v", err))
 	}
+
+	var (
+		grr       error
+		ignorable bool
+		ch        chan error = make(chan error, 1)
+	)
+
 	defer func() {
 		// defer execution of release
-		g.pool.release(address, cc, grr)
+		var err error
+		if !ignorable {
+			err = grr
+		}
+		g.pool.release(address, cc, err)
 	}()
 
-	ch := make(chan error, 1)
-
 	go func() {
-		err := cc.Invoke(ctx, methodToGRPC(req.Endpoint(), req.Body()), req.Body(), rsp, grpc.CallContentSubtype(cf.String()))
-		ch <- microError(err)
+		err := cc.Invoke(ctx, methodToGRPC(req.Service(), req.Endpoint()), req.Body(), rsp, grpc.CallContentSubtype(cf.String()))
+		ch <- err
 	}()
 
 	select {
 	case err := <-ch:
-		grr = err
+		ignorable, grr = microError(err)
 	case <-ctx.Done():
 		grr = ctx.Err()
 	}
