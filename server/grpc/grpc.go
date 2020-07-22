@@ -21,6 +21,7 @@ import (
 	meta "github.com/micro/go-micro/metadata"
 	"github.com/micro/go-micro/registry"
 	"github.com/micro/go-micro/server"
+	. "github.com/micro/go-plugins/errors"
 	"github.com/micro/util/go/lib/addr"
 	mgrpc "github.com/micro/util/go/lib/grpc"
 
@@ -311,6 +312,16 @@ func (g *grpcServer) processStream(stream grpc.ServerStream, service *service, m
 	for i := len(opts.HdlrWrappers); i > 0; i-- {
 		fn = opts.HdlrWrappers[i-1](fn)
 	}
+
+	fn = func(handlerFunc server.HandlerFunc) server.HandlerFunc {
+		return func(ctx context.Context, req server.Request, rsp interface{}) error {
+			err := handlerFunc(ctx, req, rsp)
+			if err != nil {
+				return IgnorableError("", err.Error())
+			}
+			return err
+		}
+	}(fn)
 
 	statusCode := codes.OK
 	statusDesc := ""
