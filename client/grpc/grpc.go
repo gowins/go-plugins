@@ -126,7 +126,7 @@ func (g *grpcClient) call(ctx context.Context, node *registry.Node, req client.R
 	}()
 
 	go func() {
-		err := cc.Invoke(ctx, methodToGRPC(req.Service(), req.Endpoint()), req.Body(), rsp, grpc.CallContentSubtype(cf.String()))
+		err := cc.Invoke(ctx, methodToGRPC(req.Endpoint(), req.Body()), req.Body(), rsp, grpc.CallContentSubtype(cf.String()))
 		ch <- err
 	}()
 
