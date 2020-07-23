@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gowins/go-kit/grpc/client/pool"
 	"github.com/micro/go-micro/broker"
 	"github.com/micro/go-micro/client"
 	"github.com/micro/go-micro/cmd"
@@ -28,7 +29,7 @@ import (
 type grpcClient struct {
 	once sync.Once
 	opts client.Options
-	pool *pool
+	pool *pool.Pool
 }
 
 func init() {
@@ -100,7 +101,7 @@ func (g *grpcClient) call(ctx context.Context, node *registry.Node, req client.R
 	maxRecvMsgSize := g.maxRecvMsgSizeValue()
 	maxSendMsgSize := g.maxSendMsgSizeValue()
 
-	cc, err := g.pool.getConn(address, grpc.WithDefaultCallOptions(grpc.CallCustomCodec(cf)),
+	cc, err := g.pool.GetConn(address, grpc.WithDefaultCallOptions(grpc.CallCustomCodec(cf)),
 		grpc.WithTimeout(opts.DialTimeout), g.secure(),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(maxRecvMsgSize),
@@ -122,7 +123,7 @@ func (g *grpcClient) call(ctx context.Context, node *registry.Node, req client.R
 		if !ignorable {
 			err = grr
 		}
-		g.pool.release(address, cc, err)
+		g.pool.Release(address, cc, err)
 	}()
 
 	go func() {
@@ -247,20 +248,12 @@ func (g *grpcClient) newCodec(contentType string) (codec.NewCodec, error) {
 }
 
 func (g *grpcClient) Init(opts ...client.Option) error {
-	size := g.opts.PoolSize
-	ttl := g.opts.PoolTTL
-
 	for _, o := range opts {
 		o(&g.opts)
 	}
 
 	// update pool configuration if the options changed
-	if size != g.opts.PoolSize || ttl != g.opts.PoolTTL {
-		g.pool.Lock()
-		g.pool.size = g.opts.PoolSize
-		g.pool.ttl = int64(g.opts.PoolTTL.Seconds())
-		g.pool.Unlock()
-	}
+	g.pool.Init(g.opts.PoolSize, g.opts.PoolTTL)
 
 	return nil
 }
@@ -285,7 +278,7 @@ func (g *grpcClient) Call(ctx context.Context, req client.Request, rsp interface
 				return
 			}
 
-			if v, ok:= callErr.(*errors.Error); ok{
+			if v, ok := callErr.(*errors.Error); ok {
 				v.Detail = fmt.Sprintf("error: %v, node: %v", v.Detail, callNode.Id)
 				callErr = v
 			} else {
@@ -550,7 +543,7 @@ func newClient(opts ...client.Option) client.Client {
 	rc := &grpcClient{
 		once: sync.Once{},
 		opts: options,
-		pool: newPool(options.PoolSize, options.PoolTTL),
+		pool: pool.NewPool(options.PoolSize, options.PoolTTL),
 	}
 
 	c := client.Client(rc)
