@@ -30,7 +30,7 @@ require (
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/websocket v1.4.0
-	github.com/gowins/go-kit v0.0.1-beta1.0.20200722133623-4b91c28a4822
+	github.com/gowins/go-kit v0.0.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.9.5 // indirect
 	github.com/hashicorp/go-discover v0.0.0-20200108194735-7698de1390a1 // indirect
