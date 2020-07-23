@@ -1,5 +1,7 @@
 module github.com/micro/go-plugins
 
+go 1.12
+
 require (
 	cloud.google.com/go v0.41.0
 	contrib.go.opencensus.io/exporter/ocagent v0.4.12 // indirect
@@ -28,6 +30,7 @@ require (
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/websocket v1.4.0
+	github.com/gowins/go-kit v0.0.1-beta1.0.20200722133623-4b91c28a4822
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.9.5 // indirect
 	github.com/hashicorp/go-discover v0.0.0-20200108194735-7698de1390a1 // indirect
@@ -59,12 +62,12 @@ require (
 	github.com/samuel/go-zookeeper v0.0.0-20180130194729-c4fab1ac1bec
 	github.com/shirou/gopsutil v2.20.3+incompatible // indirect
 	github.com/sirupsen/logrus v1.4.2
-	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a
+	github.com/smartystreets/goconvey v1.6.4
 	github.com/sony/gobreaker v0.0.0-20181109014844-d928aaea92e1
 	github.com/streadway/amqp v0.0.0-20181205114330-a314942b2fd9
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 	github.com/tinylib/msgp v1.1.0
-	github.com/uber-go/atomic v1.3.2
+	github.com/uber-go/atomic v1.4.0
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.etcd.io/etcd v3.3.12+incompatible
 	go.opencensus.io v0.22.0
