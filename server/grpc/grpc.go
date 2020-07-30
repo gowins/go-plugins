@@ -317,7 +317,7 @@ func (g *grpcServer) processStream(stream grpc.ServerStream, service *service, m
 		return func(ctx context.Context, req server.Request, rsp interface{}) error {
 			err := handlerFunc(ctx, req, rsp)
 			if err != nil {
-				return IgnorableError("", err.Error())
+				return WrapIgnorableError(err)
 			}
 			return err
 		}

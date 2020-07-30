@@ -2,43 +2,39 @@ package grpc
 
 import (
 	"github.com/micro/go-micro/errors"
-	. "github.com/micro/go-plugins/errors"
-
 	"google.golang.org/grpc/status"
+
+	. "github.com/micro/go-plugins/errors"
 )
 
 func microError(err error) (bool, error) {
-	// 这个错误是否可以忽略
-	ignorable := false
-
 	// no error
 	switch err {
 	case nil:
-		return ignorable, nil
+		return false, nil
 	}
 
 	// micro error
 	if v, ok := err.(*errors.Error); ok {
-		// micro的errors包增加了一个特定的错误类型，
-		// 避免一些特殊情况我们没有覆盖到（比如grpc.call之前就返回错误了）。
-		if v.Code == StatusIgnorableError {
-			ignorable = true // actually a business error
-		}
-		return ignorable, v
+		return false, v
 	}
 
 	// grpc error
 	if s, ok := status.FromError(err); ok {
 		errMsg := s.Message()
-		if e := errors.Parse(errMsg); e.Code == StatusIgnorableError {
-			ignorable = true // actually a business error
-			errMsg = e.Detail
-		} else if e.Code > 0 {
+		// ignorable 标识来源到是否包了一层 ignore error
+		ignorable, errs := UnwrapIgnorableError(errMsg) // 从错误中得到是否可忽略的标识
+		if ignorable {
+			// 如果是可忽略的则继续解析刚问的错误，得到真实的错误
+			errMsg = errs
+		}
+
+		if e := errors.Parse(errMsg); e.Code > 0 {
 			return ignorable, e // actually a micro error
 		}
 		return ignorable, errors.InternalServerError("go.micro.client", errMsg)
 	}
 
 	// do nothing
-	return ignorable, err
+	return false, err
 }

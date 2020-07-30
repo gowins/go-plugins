@@ -6,11 +6,15 @@ require (
 	cloud.google.com/go v0.41.0
 	contrib.go.opencensus.io/exporter/ocagent v0.4.12 // indirect
 	github.com/Shopify/sarama v1.21.0
+	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5
+	github.com/anacrolix/envpprof v1.1.1 // indirect
+	github.com/anacrolix/sync v0.2.0 // indirect
 	github.com/anacrolix/utp v0.0.0-20180219060659-9e0e1d1d0572
 	github.com/asim/go-awsxray v0.0.0-20161209120537-0d8a60b6e205
 	github.com/asim/go-bson v0.0.0-20160318195205-84522947cabd
 	github.com/aws/aws-sdk-go v1.29.29
+	github.com/bradfitz/iter v0.0.0-20191230175014-e8f45d346db8 // indirect
 	github.com/bsm/sarama-cluster v2.1.15+incompatible // indirect
 	github.com/bwmarrin/discordgo v0.19.0
 	github.com/clbanning/x2j v0.0.0-20191024224557-825249438eec // indirect
